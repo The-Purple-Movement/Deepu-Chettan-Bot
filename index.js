@@ -1,13 +1,12 @@
 require("dotenv").config();
-const fs = require("fs");
 const path = require("path");
-const { Client, GatewayIntentBits, Partials, Events, EmbedBuilder, AttachmentBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, Partials, Events, AttachmentBuilder } = require("discord.js");
 const Canvas = require("canvas");
 const http = require("http");
 
 const PORT = process.env.PORT || 3000; // Render sets this automatically
 
-http.createServer((req, res) => {
+http.createServer((res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("Bot is running!");
 }).listen(PORT, () => {
@@ -25,20 +24,6 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.GuildMember],
 });
 
-const roleMap = {
-  "🧠": "1389289525259534427",
-  "💻": "1389259991181037819",
-  "🎨": "1389289308900556892",
-  "🗞️": "1389289399295938742",
-  "📸": "1389684342841675796",
-  "🎥": "1389684572500787472",
-};
-
-const dataPath = path.join(__dirname, "reactionData.json");
-if (!fs.existsSync(dataPath)) {
-  fs.writeFileSync(dataPath, JSON.stringify({ messageId: null }, null, 2));
-}
-
 function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -52,95 +37,10 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.quadraticCurveTo(x, y, x + radius, y);
   ctx.closePath();
 }
+
 // === Bot Ready ===
 client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
-  const channel = client.channels.cache.get("1389273427541626952");
-  if (!channel) return console.error("❌ Channel not found.");
-
-  const data = JSON.parse(fs.readFileSync(dataPath, "utf8"));
-
-  if (!data.messageId) {
-    await channel.send({ content: `@everyone Choose your team roles below!` });
-
-    const embed = new EmbedBuilder()
-      .setColor("#8E5CB7")
-      .setTitle("✨ Choose Your Squad")
-      .setDescription(`
-React to get your roles based on your interests:
-
-🧠 — **Strategy**  
-💻 — **Tech Team**  
-🎨 — **Creative Team**  
-🗞️ — **Media Team**  
-📸 — **Photography Team**  
-🎥 — **Video Team**
-
-_You can pick multiple roles 💫_
-      `)
-      .setFooter({ text: "Team Purple • Purple Movement 💜" });
-
-    const msg = await channel.send({ embeds: [embed] });
-    for (const emoji of Object.keys(roleMap)) {
-      await msg.react(emoji);
-    }
-
-    fs.writeFileSync(dataPath, JSON.stringify({ messageId: msg.id }, null, 2));
-    console.log("📌 Reaction role panel sent & saved.");
-  } else {
-    console.log("ℹ️ Reaction panel already exists. Skipping...");
-  }
-});
-
-// === Handle Reaction Add ===
-client.on(Events.MessageReactionAdd, async (reaction, user) => {
-  if (reaction.partial) await reaction.fetch();
-  if (user.bot) return;
-
-  const emoji = reaction.emoji.name;
-
-  // ❌ Remove invalid emoji
-  if (!roleMap[emoji]) {
-    try {
-      await reaction.users.remove(user.id);
-      console.log(`🚫 Removed invalid emoji (${emoji}) from ${user.tag}`);
-    } catch (err) {
-      console.error("⚠️ Couldn't remove emoji:", err);
-    }
-    return;
-  }
-
-  // ✅ Assign role
-  const roleId = roleMap[emoji];
-  const member = await reaction.message.guild.members.fetch(user.id);
-  if (member) {
-    try {
-      await member.roles.add(roleId);
-      console.log(`✅ Added ${emoji} to ${user.tag}`);
-    } catch (err) {
-      console.error("❌ Failed to add role:", err);
-    }
-  }
-});
-
-// === Handle Reaction Remove ===
-client.on(Events.MessageReactionRemove, async (reaction, user) => {
-  if (reaction.partial) await reaction.fetch();
-  if (user.bot) return;
-
-  const emoji = reaction.emoji.name;
-  const roleId = roleMap[emoji];
-  if (!roleId) return;
-
-  const member = await reaction.message.guild.members.fetch(user.id);
-  if (member) {
-    try {
-      await member.roles.remove(roleId);
-      console.log(`🚫 Removed ${emoji} from ${user.tag}`);
-    } catch (err) {
-      console.error("❌ Failed to remove role:", err);
-    }
-  }
 });
 
 client.on(Events.GuildMemberAdd, async (member) => {
